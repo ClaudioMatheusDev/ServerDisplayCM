@@ -1,0 +1,6 @@
+@ServerDisplayCM.Agent_HostAddress = http://localhost:5294
+
+GET {{ServerDisplayCM.Agent_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
