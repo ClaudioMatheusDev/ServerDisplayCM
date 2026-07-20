@@ -14,6 +14,7 @@ TFT_eSPI tft = TFT_eSPI();
 unsigned long ultimaConsulta = 0;
 const unsigned long intervaloConsulta = 2000;
 
+<<<<<<< HEAD
 void drawHeader(const char* title, uint16_t accentColor)
 {
     tft.fillRect(0, 0, 320, 44, TFT_DARKCYAN);
@@ -46,14 +47,21 @@ void drawMetricCard(
     tft.drawString(unit, x + 24, y + 52, 2);
 }
 
+=======
+>>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
 void conectarWiFi()
 {
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
+<<<<<<< HEAD
     tft.fillScreen(TFT_BLACK);
     drawHeader("Conectando...", TFT_YELLOW);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.drawString("Aguardando rede Wi-Fi", 54, 90, 2);
+=======
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.drawString("Conectando ao Wi-Fi...", 10, 20, 2);
+>>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
 
     while (WiFi.status() != WL_CONNECTED)
     {
@@ -61,15 +69,20 @@ void conectarWiFi()
     }
 
     tft.fillScreen(TFT_BLACK);
+<<<<<<< HEAD
     drawHeader("Wi-Fi conectado", TFT_GREEN);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.drawString("Sincronizando dados...", 75, 95, 2);
     delay(700);
+=======
+    tft.drawString("Wi-Fi conectado", 10, 20, 2);
+>>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
 }
 
 void mostrarOffline()
 {
     tft.fillScreen(TFT_BLACK);
+<<<<<<< HEAD
     drawHeader("Sem resposta", TFT_RED);
 
     tft.fillRoundRect(30, 62, 260, 100, 10, TFT_DARKGREY);
@@ -80,6 +93,14 @@ void mostrarOffline()
 
     tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
     tft.drawString("Verifique a API e a rede", 56, 128, 2);
+=======
+
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.drawString("PC OFFLINE", 80, 100, 4);
+
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.drawString("Verifique a API", 90, 145, 2);
+>>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
 }
 
 void atualizarTela(
@@ -90,6 +111,7 @@ void atualizarTela(
     float gpuTemperature)
 {
     tft.fillScreen(TFT_BLACK);
+<<<<<<< HEAD
     drawHeader("SERVER DISPLAY", TFT_CYAN);
 
     drawMetricCard("CPU", cpuUsage, "%", 12, 58, TFT_DARKGREY, TFT_CYAN, TFT_CYAN);
@@ -110,6 +132,48 @@ void atualizarTela(
     tft.fillRoundRect(12, 220, 296, 16, 4, TFT_BLUE);
     tft.setTextColor(TFT_WHITE, TFT_BLUE);
     tft.drawString("API ONLINE", 20, 223, 2);
+=======
+
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.drawString("SERVER DISPLAY", 60, 10, 4);
+
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
+    tft.drawString("CPU", 20, 60, 2);
+    tft.drawString(
+        String(cpuUsage, 1) + "%  " +
+        String(cpuTemperature, 1) + " C",
+        20,
+        80,
+        4
+    );
+
+    tft.drawString("MEMORIA", 20, 125, 2);
+    tft.drawString(
+        String(memoryUsage, 1) + "%",
+        20,
+        145,
+        4
+    );
+
+    tft.drawString("GPU", 175, 60, 2);
+    tft.drawString(
+        String(gpuUsage, 1) + "%",
+        175,
+        80,
+        4
+    );
+
+    tft.drawString(
+        String(gpuTemperature, 1) + " C",
+        175,
+        110,
+        2
+    );
+
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.drawString("API ONLINE", 20, 210, 2);
+>>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
 }
 
 void consultarApi()
