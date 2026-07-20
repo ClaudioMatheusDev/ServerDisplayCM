@@ -14,166 +14,298 @@ TFT_eSPI tft = TFT_eSPI();
 unsigned long ultimaConsulta = 0;
 const unsigned long intervaloConsulta = 2000;
 
-<<<<<<< HEAD
-void drawHeader(const char* title, uint16_t accentColor)
+enum class TelaAtual
 {
-    tft.fillRect(0, 0, 320, 44, TFT_DARKCYAN);
-    tft.drawFastHLine(0, 44, 320, accentColor);
-    tft.setTextColor(TFT_WHITE, TFT_DARKCYAN);
-    tft.drawString(title, 12, 10, 3);
+    Inicial,
+    Conectando,
+    Dashboard,
+    Offline
+};
+
+TelaAtual telaAtual = TelaAtual::Inicial;
+bool dashboardEstruturaMontada = false;
+String ultimoNomeMaquina = "";
+
+// ---------------------------------------------------------
+// Utilidades de desenho
+// ---------------------------------------------------------
+
+uint16_t corPorPercentual(float pct)
+{
+    if (pct >= 85.0f) return TFT_RED;
+    if (pct >= 60.0f) return TFT_YELLOW;
+    return TFT_GREEN;
 }
 
-void drawMetricCard(
-    const char* label,
-    float value,
-    const char* unit,
-    int x,
-    int y,
-    uint16_t fillColor,
-    uint16_t borderColor,
-    uint16_t accentColor)
+String extrairHora(const String& iso)
 {
-    tft.fillRoundRect(x, y, 140, 72, 8, fillColor);
-    tft.drawRoundRect(x, y, 140, 72, 8, borderColor);
-    tft.fillRect(x + 10, y + 10, 6, 52, accentColor);
+    int posT = iso.indexOf('T');
+    if (posT == -1 || iso.length() < posT + 9)
+    {
+        return "--:--:--";
+    }
 
-    tft.setTextColor(TFT_WHITE, fillColor);
-    tft.drawString(label, x + 24, y + 8, 2);
-
-    tft.setTextColor(accentColor, fillColor);
-    tft.drawString(String(value, 1), x + 24, y + 24, 4);
-
-    tft.setTextColor(TFT_LIGHTGREY, fillColor);
-    tft.drawString(unit, x + 24, y + 52, 2);
+    return iso.substring(posT + 1, posT + 9);
 }
 
-=======
->>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
+String limitarTexto(const String& texto, size_t maxLength)
+{
+    if (texto.length() <= maxLength)
+    {
+        return texto;
+    }
+
+    if (maxLength <= 3)
+    {
+        return texto.substring(0, maxLength);
+    }
+
+    return texto.substring(0, maxLength - 3) + "...";
+}
+
+void drawHeader(const String& titulo, uint16_t cor)
+{
+    tft.fillRect(0, 0, 320, 28, TFT_NAVY);
+    tft.drawFastHLine(0, 27, 320, cor);
+
+    tft.setTextColor(cor, TFT_NAVY);
+    tft.drawString(titulo, 10, 8, 2);
+}
+
+void desenharCartao(int x, int y, int w, int h, uint16_t borda)
+{
+    tft.fillRoundRect(x, y, w, h, 4, TFT_BLACK);
+    tft.drawRoundRect(x, y, w, h, 4, borda);
+}
+
+void limparAreaTexto(int x, int y, int w, int h)
+{
+    tft.fillRect(x, y, w, h, TFT_BLACK);
+}
+
+void desenharProgresso(int x, int y, int w, int h, float value, uint16_t cor)
+{
+    tft.fillRoundRect(x, y, w, h, 2, TFT_DARKGREY);
+
+    int preenchido = static_cast<int>((value / 100.0f) * w);
+    if (preenchido < 0)
+    {
+        preenchido = 0;
+    }
+    if (preenchido > w)
+    {
+        preenchido = w;
+    }
+
+    if (preenchido > 0)
+    {
+        tft.fillRoundRect(x, y, preenchido, h, 2, cor);
+    }
+}
+
+void desenharEstruturaConectando()
+{
+    if (telaAtual == TelaAtual::Conectando)
+    {
+        return;
+    }
+
+    tft.fillScreen(TFT_BLACK);
+    drawHeader("Conectando ao Wi-Fi", TFT_YELLOW);
+
+    tft.fillRoundRect(34, 78, 252, 76, 10, TFT_DARKGREY);
+    tft.drawRoundRect(34, 78, 252, 76, 10, TFT_YELLOW);
+
+    tft.setTextColor(TFT_YELLOW, TFT_DARKGREY);
+    tft.drawString("Aguardando rede Wi-Fi", 46, 98, 2);
+
+    tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
+    tft.drawString("Tentando conectar...", 58, 122, 2);
+
+    telaAtual = TelaAtual::Conectando;
+    dashboardEstruturaMontada = false;
+}
+
+void desenharEstruturaOffline()
+{
+    if (telaAtual == TelaAtual::Offline)
+    {
+        return;
+    }
+
+    tft.fillScreen(TFT_BLACK);
+    drawHeader("Sem resposta", TFT_RED);
+
+    tft.fillRoundRect(30, 60, 260, 100, 10, TFT_DARKGREY);
+    tft.drawRoundRect(30, 60, 260, 100, 10, TFT_RED);
+
+    tft.setTextColor(TFT_RED, TFT_DARKGREY);
+    tft.drawString("PC OFFLINE", 76, 90, 4);
+
+    tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
+    tft.drawString("Verifique a API e a rede", 56, 130, 2);
+
+    telaAtual = TelaAtual::Offline;
+    dashboardEstruturaMontada = false;
+}
+
+void desenharEstruturaDashboardBase(const String& machineName)
+{
+    tft.fillScreen(TFT_BLACK);
+    drawHeader(machineName, TFT_CYAN);
+
+    desenharCartao(10, 32, 145, 74, TFT_CYAN);
+    desenharCartao(165, 32, 145, 74, TFT_MAGENTA);
+    desenharCartao(10, 112, 300, 64, TFT_GREEN);
+
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.drawString("CPU", 18, 38, 1);
+    tft.drawString("GPU", 173, 38, 1);
+    tft.drawString("MEMORIA", 18, 118, 1);
+
+    tft.fillRoundRect(12, 220, 296, 16, 4, TFT_NAVY);
+    tft.drawRoundRect(12, 220, 296, 16, 4, TFT_DARKCYAN);
+
+    telaAtual = TelaAtual::Dashboard;
+    dashboardEstruturaMontada = true;
+    ultimoNomeMaquina = machineName;
+}
+
+void atualizarCabecalhoDashboard(const String& syncLabel)
+{
+    tft.fillRect(236, 6, 72, 18, TFT_NAVY);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_NAVY);
+    tft.drawString(limitarTexto(syncLabel, 10), 244, 8, 1);
+
+    tft.fillCircle(292, 14, 4, TFT_GREEN);
+}
+
+void atualizarDashboard(
+    const String& machineName,
+    const String& cpuName,
+    float cpuUsage,
+    bool cpuTempValida,
+    float cpuTemperature,
+    float memUsedGb,
+    float memTotalGb,
+    float memoryUsage,
+    const String& gpuName,
+    float gpuUsage,
+    bool gpuTempValida,
+    float gpuTemperature,
+    const String& horaColeta)
+{
+    String syncLabel = "Sync " + horaColeta;
+    if (!dashboardEstruturaMontada || ultimoNomeMaquina != machineName)
+    {
+        desenharEstruturaDashboardBase(machineName);
+    }
+
+    atualizarCabecalhoDashboard(syncLabel);
+
+    String nomeCpuExibido = limitarTexto(cpuName, 16);
+    String nomeGpuExibido = limitarTexto(gpuName, 24);
+
+    // Nome da CPU (substitui o rotulo "CPU" da estrutura base)
+    limparAreaTexto(18, 38, 128, 10);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.drawString(nomeCpuExibido, 18, 38, 1);
+
+    // Percentual de uso da CPU (fonte 4 ~26px de altura)
+    limparAreaTexto(18, 54, 110, 26);
+    tft.setTextColor(corPorPercentual(cpuUsage), TFT_BLACK);
+    tft.drawString(String(cpuUsage, 1) + "%", 18, 54, 4);
+
+    limparAreaTexto(18, 88, 120, 10);
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.drawString(
+        cpuTempValida ? (String(cpuTemperature, 1) + " C") : "temp N/D",
+        18,
+        88,
+        1);
+
+    desenharProgresso(18, 98, 124, 6, cpuUsage, corPorPercentual(cpuUsage));
+
+    // Nome da GPU (substitui o rotulo "GPU" da estrutura base)
+    limparAreaTexto(173, 38, 124, 10);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.drawString(nomeGpuExibido, 173, 38, 1);
+
+    limparAreaTexto(173, 54, 110, 26);
+    tft.setTextColor(corPorPercentual(gpuUsage), TFT_BLACK);
+    tft.drawString(String(gpuUsage, 1) + "%", 173, 54, 4);
+
+    limparAreaTexto(173, 88, 124, 10);
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.drawString(
+        gpuTempValida ? (String(gpuTemperature, 1) + " C") : "temp N/D",
+        173,
+        88,
+        1);
+
+    desenharProgresso(173, 98, 124, 6, gpuUsage, corPorPercentual(gpuUsage));
+
+    // --- Memoria: percentual, detalhe em GB e barra, sem sobrepor ---
+    limparAreaTexto(18, 128, 130, 26);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.drawString(String(memoryUsage, 1) + "%", 18, 128, 4);
+
+    limparAreaTexto(150, 132, 160, 14);
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.drawString(
+        String(memUsedGb, 1) + " / " + String(memTotalGb, 1) + " GB",
+        150,
+        136,
+        1);
+
+    desenharProgresso(18, 160, 276, 8, memoryUsage, TFT_GREEN);
+
+    tft.fillRect(14, 222, 292, 12, TFT_NAVY);
+    tft.setTextColor(TFT_LIGHTGREY, TFT_NAVY);
+    tft.drawString("Atualizado " + horaColeta, 16, 223, 1);
+
+    telaAtual = TelaAtual::Dashboard;
+}
+
+// ---------------------------------------------------------
+// Consulta a API
+// ---------------------------------------------------------
+
 void conectarWiFi()
 {
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-<<<<<<< HEAD
-    tft.fillScreen(TFT_BLACK);
-    drawHeader("Conectando...", TFT_YELLOW);
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.drawString("Aguardando rede Wi-Fi", 54, 90, 2);
-=======
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.drawString("Conectando ao Wi-Fi...", 10, 20, 2);
->>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
+    desenharEstruturaConectando();
+
+    unsigned long inicio = millis();
+    const unsigned long timeoutMs = 20000;
 
     while (WiFi.status() != WL_CONNECTED)
     {
+        if (millis() - inicio > timeoutMs)
+        {
+            WiFi.disconnect();
+            delay(500);
+            WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+            inicio = millis();
+            desenharEstruturaConectando();
+        }
+
         delay(500);
     }
 
     tft.fillScreen(TFT_BLACK);
-<<<<<<< HEAD
     drawHeader("Wi-Fi conectado", TFT_GREEN);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.drawString("Sincronizando dados...", 75, 95, 2);
     delay(700);
-=======
-    tft.drawString("Wi-Fi conectado", 10, 20, 2);
->>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
+
+    telaAtual = TelaAtual::Inicial;
 }
 
 void mostrarOffline()
 {
-    tft.fillScreen(TFT_BLACK);
-<<<<<<< HEAD
-    drawHeader("Sem resposta", TFT_RED);
-
-    tft.fillRoundRect(30, 62, 260, 100, 10, TFT_DARKGREY);
-    tft.drawRoundRect(30, 62, 260, 100, 10, TFT_RED);
-
-    tft.setTextColor(TFT_RED, TFT_DARKGREY);
-    tft.drawString("PC OFFLINE", 76, 84, 4);
-
-    tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
-    tft.drawString("Verifique a API e a rede", 56, 128, 2);
-=======
-
-    tft.setTextColor(TFT_RED, TFT_BLACK);
-    tft.drawString("PC OFFLINE", 80, 100, 4);
-
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.drawString("Verifique a API", 90, 145, 2);
->>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
-}
-
-void atualizarTela(
-    float cpuUsage,
-    float cpuTemperature,
-    float memoryUsage,
-    float gpuUsage,
-    float gpuTemperature)
-{
-    tft.fillScreen(TFT_BLACK);
-<<<<<<< HEAD
-    drawHeader("SERVER DISPLAY", TFT_CYAN);
-
-    drawMetricCard("CPU", cpuUsage, "%", 12, 58, TFT_DARKGREY, TFT_CYAN, TFT_CYAN);
-    drawMetricCard("GPU", gpuUsage, "%", 168, 58, TFT_DARKGREY, TFT_CYAN, TFT_MAGENTA);
-    drawMetricCard("MEM", memoryUsage, "%", 12, 142, TFT_DARKGREY, TFT_CYAN, TFT_GREEN);
-
-    tft.fillRoundRect(168, 142, 140, 72, 8, TFT_DARKGREY);
-    tft.drawRoundRect(168, 142, 140, 72, 8, TFT_CYAN);
-    tft.fillRect(178, 152, 6, 52, TFT_YELLOW);
-
-    tft.setTextColor(TFT_WHITE, TFT_DARKGREY);
-    tft.drawString("TEMP", 198, 150, 2);
-    tft.setTextColor(TFT_YELLOW, TFT_DARKGREY);
-    tft.drawString(String(cpuTemperature, 1) + "C", 198, 170, 4);
-    tft.setTextColor(TFT_LIGHTGREY, TFT_DARKGREY);
-    tft.drawString(String(gpuTemperature, 1) + "C", 198, 198, 2);
-
-    tft.fillRoundRect(12, 220, 296, 16, 4, TFT_BLUE);
-    tft.setTextColor(TFT_WHITE, TFT_BLUE);
-    tft.drawString("API ONLINE", 20, 223, 2);
-=======
-
-    tft.setTextColor(TFT_CYAN, TFT_BLACK);
-    tft.drawString("SERVER DISPLAY", 60, 10, 4);
-
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-
-    tft.drawString("CPU", 20, 60, 2);
-    tft.drawString(
-        String(cpuUsage, 1) + "%  " +
-        String(cpuTemperature, 1) + " C",
-        20,
-        80,
-        4
-    );
-
-    tft.drawString("MEMORIA", 20, 125, 2);
-    tft.drawString(
-        String(memoryUsage, 1) + "%",
-        20,
-        145,
-        4
-    );
-
-    tft.drawString("GPU", 175, 60, 2);
-    tft.drawString(
-        String(gpuUsage, 1) + "%",
-        175,
-        80,
-        4
-    );
-
-    tft.drawString(
-        String(gpuTemperature, 1) + " C",
-        175,
-        110,
-        2
-    );
-
-    tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.drawString("API ONLINE", 20, 210, 2);
->>>>>>> ece48f7678d95db55c58805ab59064038de98d5b
+    desenharEstruturaOffline();
 }
 
 void consultarApi()
@@ -185,7 +317,6 @@ void consultarApi()
     }
 
     HTTPClient http;
-
     http.setTimeout(3000);
     http.begin(API_URL);
 
@@ -201,9 +332,7 @@ void consultarApi()
     String payload = http.getString();
 
     JsonDocument document;
-
-    DeserializationError error =
-        deserializeJson(document, payload);
+    DeserializationError error = deserializeJson(document, payload);
 
     if (error)
     {
@@ -212,31 +341,54 @@ void consultarApi()
         return;
     }
 
-    float cpuUsage =
-        document["cpu"]["usagePercent"] | 0.0;
+    String machineName = document["machineName"] | "PC";
+    String status = document["status"] | "offline";
 
-    float cpuTemperature =
-        document["cpu"]["temperatureCelsius"] | 0.0;
+    String cpuName = document["cpu"]["name"] | "CPU";
+    float cpuUsage = document["cpu"]["usagePercent"] | 0.0f;
+    bool cpuTempValida = !document["cpu"]["temperatureCelsius"].isNull();
+    float cpuTemperature = document["cpu"]["temperatureCelsius"] | 0.0f;
 
-    float memoryUsage =
-        document["memory"]["usagePercent"] | 0.0;
+    float memUsedGb = document["memory"]["usedGb"] | 0.0f;
+    float memTotalGb = document["memory"]["totalGb"] | 0.0f;
+    float memoryUsage = document["memory"]["usagePercent"] | 0.0f;
 
-    float gpuUsage =
-        document["gpu"]["usagePercent"] | 0.0;
+    String gpuName = document["gpu"]["name"] | "GPU";
+    float gpuUsage = document["gpu"]["usagePercent"] | 0.0f;
+    bool gpuTempValida = !document["gpu"]["temperatureCelsius"].isNull();
+    float gpuTemperature = document["gpu"]["temperatureCelsius"] | 0.0f;
 
-    float gpuTemperature =
-        document["gpu"]["temperatureCelsius"] | 0.0;
+    String collectedAt = document["collectedAt"] | "";
+    String horaColeta = extrairHora(collectedAt);
 
-    atualizarTela(
+    if (status != "online")
+    {
+        http.end();
+        mostrarOffline();
+        return;
+    }
+
+    atualizarDashboard(
+        machineName,
+        cpuName,
         cpuUsage,
+        cpuTempValida,
         cpuTemperature,
+        memUsedGb,
+        memTotalGb,
         memoryUsage,
+        gpuName,
         gpuUsage,
-        gpuTemperature
-    );
+        gpuTempValida,
+        gpuTemperature,
+        horaColeta);
 
     http.end();
 }
+
+// ---------------------------------------------------------
+// Setup / loop
+// ---------------------------------------------------------
 
 void setup()
 {

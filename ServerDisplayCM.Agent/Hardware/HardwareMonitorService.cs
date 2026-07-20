@@ -110,6 +110,8 @@ public sealed class HardwareMonitorService :
         IHardware hardware,
         ComputerMetrics metrics)
     {
+        metrics.Cpu.Name = hardware.Name;
+
         var totalLoad = hardware.Sensors.FirstOrDefault(sensor =>
             sensor.SensorType == SensorType.Load &&
             sensor.Name.Contains("CPU Total",
