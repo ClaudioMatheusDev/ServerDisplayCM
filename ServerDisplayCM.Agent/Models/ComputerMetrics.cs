@@ -17,6 +17,7 @@ public sealed class ComputerMetrics
 
 public sealed class CpuMetrics
 {
+    public string Name {get; set;} = "Não encontrado.";
     public float UsagePercent { get; set; }
 
     public float? TemperatureCelsius { get; set; }
